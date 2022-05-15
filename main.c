@@ -11,10 +11,14 @@
 #define DEFAULT_PORT 8081
 #define DEFAULT_BACKLOG 100
 
+struct workqueue_struct *khttpd_wq;
+
 static ushort port = DEFAULT_PORT;
 module_param(port, ushort, S_IRUGO);
 static ushort backlog = DEFAULT_BACKLOG;
 module_param(backlog, ushort, S_IRUGO);
+bool bench = false;
+module_param(bench, bool, S_IRUGO);
 
 static struct socket *listen_socket;
 static struct http_server_param param;
@@ -160,6 +164,27 @@ static int __init khttpd_init(void)
         return err;
     }
     param.listen_socket = listen_socket;
+
+    /*
+     * Create a dedicated workqueue instead of using system_wq
+     * since the task could be a CPU-intensive work item
+     * if its lifetime of connection is too long, e.g., using
+     * `telnet` to communicate with kecho. Flag WQ_UNBOUND
+     * fits this scenario. Note that the trade-off of this
+     * flag is cache locality.
+     *
+     * You can specify module parameter "bench=1" if you won't
+     * use telnet-like program to interact with the module.
+     * This earns you better cache locality than using default
+     * flag, `WQ_UNBOUND`. Note that your machine may going
+     * unstable if you use telnet-like program along with
+     * module parameter "bench=1" to interact with the module.
+     * Since without `WQ_UNBOUND` flag specified, a
+     * long-running task may delay other tasks in the kernel.
+     *
+     * Try setting of WQ_HIGHPRI|WQ_CPU_INTENSIVE around.
+     */
+    khttpd_wq = alloc_workqueue(MODULE_NAME, bench ? 0 : WQ_UNBOUND, 0);
     http_server = kthread_run(http_server_daemon, &param, KBUILD_MODNAME);
     if (IS_ERR(http_server)) {
         pr_err("can't start http server daemon\n");

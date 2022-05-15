@@ -1,10 +1,10 @@
 KDIR=/lib/modules/$(shell uname -r)/build
-
+TARGET_MODULE = khtttpd
 CFLAGS_user = -std=gnu11 -Wall -Wextra -Werror
 LDFLAGS_user = -lpthread
 
-obj-m += khttpd.o
-khttpd-objs := \
+obj-m += $(TARGET_MODULE).o
+$(TARGET_MODULE)-objs := \
 	http_parser.o \
 	http_server.o \
 	main.o
@@ -21,7 +21,14 @@ htstress: htstress.c
 	$(CC) $(CFLAGS_user) -o $@ $< $(LDFLAGS_user)
 
 check: all
+	make htstress
 	@scripts/test.sh
+
+load: all
+	sudo insmod $(TARGET_MODULE).ko
+
+unload:
+	sudo rmmod $(TARGET_MODULE) || true > /dev/null
 
 clean:
 	make -C $(KDIR) M=$(PWD) clean

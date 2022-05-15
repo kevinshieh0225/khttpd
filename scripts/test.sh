@@ -8,13 +8,13 @@ if [ "$EUID" -eq 0 ]
 fi
 
 # load kHTTPd
-sudo rmmod -f khttpd 2>/dev/null
+make unload
 sleep 1
-sudo insmod $KHTTPD_MOD
+make load
 
 # run HTTP benchmarking
 ./htstress -n 100000 -c 1 -t 4 http://localhost:8081/
 
 # epilogue
-sudo rmmod khttpd
+make unload
 echo "Complete"
